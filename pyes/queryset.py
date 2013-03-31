@@ -11,7 +11,6 @@ Taken from django one and from django-elasticsearch.
 import copy
 
 # The maximum number of items to display in a QuerySet.__repr__
-from .es import ES
 from .filters import ANDFilter, ORFilter, NotFilter, Filter, TermsFilter, TermFilter, RangeFilter, ExistsFilter
 from .facets import Facet, TermFacet
 from .models import ElasticSearchModel
@@ -23,28 +22,16 @@ REPR_OUTPUT_SIZE = 20
 
 class DoesNotExist(Exception):
     pass
+ElasticSearchModel.DoesNotExist = DoesNotExist
 
 
 class MultipleObjectsReturned(Exception):
     pass
-
-
-class ESModel(ElasticSearchModel):
-
-    def __init__(self, index, type, es_url=None, es_kwargs={}):
-        self._index = index
-        self._type = type
-        self.objects = QuerySet(self, es_url=es_url, es_kwargs=es_kwargs)
-        setattr(self, "DoesNotExist", DoesNotExist)
-        setattr(self, "MultipleObjectsReturned", MultipleObjectsReturned)
-
+ElasticSearchModel.MultipleObjectsReturned = MultipleObjectsReturned
 
 def generate_model(index, doc_type, es_url=None, es_kwargs={}):
     MyModel = type('MyModel', (ElasticSearchModel,), {})
-
-    setattr(MyModel, "objects", QuerySet(MyModel, index=index, type=doc_type, es_url=es_url, es_kwargs=es_kwargs))
-    setattr(MyModel, "DoesNotExist", DoesNotExist)
-    setattr(MyModel, "MultipleObjectsReturned", MultipleObjectsReturned)
+    MyModel.objects = QuerySet(MyModel, index=index, type=doc_type, es_url=es_url, es_kwargs=es_kwargs)
     return MyModel
 
 
@@ -54,18 +41,17 @@ class QuerySet(object):
     """
     def __init__(self, model=None, using=None, index=None, type=None, conn=None, es_url=None, es_kwargs=None):
         if model is None and index and type:
-            model = ESModel(index, type, es_url=self.es_url, es_kwargs=self.es_kwargs)
+            model = ElasticSearchModel
         self.model = model
         es_kwargs = es_kwargs or {}
         if es_url:
             es_kwargs.update(server=es_url)
+        from .es import ES
         self.connection = conn or ES(**es_kwargs)
 
         # EmptyQuerySet instantiates QuerySet with model as None
-        self._index = index
-        if using:
-            self._index = using
-        self._type=type
+        self.index = using or index
+        self.type = type
         self._queries = []
         self._filters = []
         self._facets = []
@@ -79,18 +65,6 @@ class QuerySet(object):
         #reset ordering
         self._ordering=[]
         
-    @property
-    def index(self):
-        if self._index:
-            return self._index
-        return self.model._index
-
-    @property
-    def type(self):
-        if self._type:
-            return self._type
-        return self.model._type
-
     ########################
     # PYTHON MAGIC METHODS #
     ########################
@@ -325,6 +299,7 @@ class QuerySet(object):
         and returning the created object.
         """
         obj = self.model(**kwargs)
+        obj._meta.connection = self.connection
         obj.save(force_insert=True, using=self.index)
         return obj
 
