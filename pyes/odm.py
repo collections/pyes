@@ -1,6 +1,6 @@
 """Object Document Mapper"""
 from models import ElasticSearchModel
-from mappings import AbstractField
+from mappings import ModelField
 from exceptions import ElasticModelException
 from queryset import QuerySet
 
@@ -10,12 +10,13 @@ class ModelMeta(type):
     def __new__(mcs, name, bases, attrs):
         cls = super(ModelMeta, mcs).__new__(mcs, name, bases, attrs)
         cls._fields = {}
-        for name, field in ((k, getattr(cls, k)) for k in dir(cls)):
-            if isinstance(field, AbstractField):
-                field.name = field.name or name
-                if field.name in ['_source', 'fields']:
-                    raise ElasticModelException('Field name %s is reserved. Invalid %s' % (name, field))
-                cls._fields[name] = field
+        for clazz in reversed(cls.__mro__):
+            for name, field in clazz.__dict__.iteritems():
+                if isinstance(field, ModelField):
+                    field.name = field.name or name
+                    if field.name in ['_source', 'fields']:
+                        raise ElasticModelException('Field name %s is reserved. Invalid %s' % (name, field))
+                    cls._fields[name] = field
 
         if cls.Meta.index and cls.Meta.type:
             # TODO: Error checking here to make sure type and index are both defined on subclass!
@@ -90,6 +91,7 @@ class Model(ElasticSearchModel):
     def save(self, *args, **kwargs):
         for field in self._fields.values():
             field.validate(self)
+            field.on_save(self)
         super(Model, self).save(*args, **kwargs)
 
     @classmethod

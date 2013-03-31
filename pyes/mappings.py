@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import threading
+import datetime
 from .exceptions import FieldValidationException
 from .models import SortedDict, DotDict
 
@@ -37,6 +38,11 @@ check_values = {
 }
 
 class ModelField(object):
+
+    def __init__(self, required=False, default=None):
+        self.required = required
+        self.default = default
+
     def __get__(self, instance, owner):
         if instance is None:
             return self
@@ -55,6 +61,11 @@ class ModelField(object):
             if not value:
                 raise FieldValidationException('Required field %s is missing' % self)
 
+    def on_save(self, obj):
+        # Let's not store empty fields inside lucene
+        if self.name in obj and not obj[self.name]:
+            del obj[self.name]
+
 class AbstractField(ModelField):
     def __init__(self, index="not_analyzed", store="no", boost=1.0,
                  term_vector="no", omit_norms=True,
@@ -64,9 +75,8 @@ class AbstractField(ModelField):
                  analyzer=None,
                  index_analyzer=None,
                  search_analyzer=None,
-                 name=None,
-                 required=False,
-                 default=None):
+                 name=None, **kwargs):
+        super(AbstractField, self).__init__(**kwargs)
         self.store = to_bool(store)
         self.boost = boost
         self.term_vector = term_vector
@@ -80,8 +90,6 @@ class AbstractField(ModelField):
         self.search_analyzer = search_analyzer
         self.name = name
         self.path = path
-        self.required = required
-        self.default = default
 
     def as_dict(self):
         result = {"type": self.type,
@@ -250,16 +258,26 @@ class DoubleField(NumericFieldAbstract):
 
 
 class DateField(NumericFieldAbstract):
-    def __init__(self, format=None, **kwargs):
+    def __init__(self, format=None, auto_now=False, auto_now_add=False, **kwargs):
         super(DateField, self).__init__(**kwargs)
         self.format = format
         self.type = "date"
+        self.auto_now = auto_now
+        self.auto_now_add = auto_now_add
 
     def as_dict(self):
         result = super(DateField, self).as_dict()
         if self.format:
             result['format'] = self.format
         return result
+
+    def on_save(self, obj):
+        super(DateField, self).on_save(obj)
+        if self.auto_now_add:
+            if obj.get(self.name, None) is None:
+                obj[self.name] = datetime.datetime.now()
+        elif self.auto_now:
+            obj[self.name] = datetime.datetime.now()
 
 
 class BooleanField(AbstractField):
@@ -279,7 +297,8 @@ class BooleanField(AbstractField):
 
 
 class MultiField(ModelField):
-    def __init__(self, name, type=None, path=None, fields=None):
+    def __init__(self, name, type=None, path=None, fields=None, **kwargs):
+        super(MultiField, self).__init__(**kwargs)
         self.name = name
         self.type = "multi_field"
         self.path = path
@@ -312,7 +331,8 @@ class AttachmentField(ModelField):
 
     """
 
-    def __init__(self, name, type=None, path=None, fields=None):
+    def __init__(self, name, type=None, path=None, fields=None, **kwargs):
+        super(AttachmentField, self).__init__(**kwargs)
         self.name = name
         self.type = "attachment"
         self.path = path
@@ -331,7 +351,8 @@ class ObjectField(ModelField):
     def __init__(self, name=None, type=None, path=None, properties=None,
                  dynamic=None, enabled=None, include_in_all=None, dynamic_templates=None,
                  include_in_parent=None, include_in_root=None,
-                 connection=None, index_name=None, *args, **kwargs):
+                 connection=None, index_name=None, **kwargs):
+        super(ObjectField, self).__init__(**kwargs)
         self.name = name
         self.type = "object"
         self.path = path
