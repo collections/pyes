@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import threading
+from .exceptions import FieldValidationException
 from .models import SortedDict, DotDict
 
 _thread_locals = threading.local()
@@ -120,7 +121,7 @@ class AbstractField(object):
             try:
                 obj.__getitem__(self.name)
             except KeyError:
-                raise Exception('Required field %s is missing' % self)
+                raise FieldValidationException('Required field %s is missing' % self)
 
 
 class StringField(AbstractField):
