@@ -31,21 +31,21 @@ class ModelMeta(type):
 
 
 def model_factory(default_cls=ElasticSearchModel):
-    def _model_factory(*args, **kwargs):
-        from .es import ES
-        if len(args) == 2 and isinstance(args[0], ES):
-            item = args[1]
-            cls = ModelMeta.get_registered_model(item._index, item._type) or default_cls
-            ins = cls()
-            ins.update(item.pop("_source", DotDict()))
-            ins.update(item.pop("fields", {}))
-            ins._meta = DotDict([(k.lstrip("_"), v) for k, v in item.items()])
+    def _model_factory(conn=None, data=None):
+        data = data or {}
+        if '_source' in data or 'fields' in data:
+            cls = ModelMeta.get_registered_model(data.get('_index', None), data.get('_type', None)) or default_cls
+            ins = cls(conn)
+            ins.update(data.pop("_source", DotDict()))
+            ins.update(data.pop("fields", {}))
+            ins._meta = DotDict([(k.lstrip("_"), v) for k, v in data.items()])
             ins._meta.parent = ins.pop("_parent", None)
-            ins._meta.connection = args[0]
         else:
-            ins = default_cls()
-            ins.update(dict(*args, **kwargs))
+            ins = default_cls(conn)
+            ins.update(data)
         return ins
+    _model_factory.DoesNotExist = default_cls.DoesNotExist
+    _model_factory.MultipleObjectsReturned = default_cls.MultipleObjectsReturned
     return _model_factory
 
 

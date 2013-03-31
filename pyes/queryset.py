@@ -40,10 +40,10 @@ class QuerySet(object):
     Represents a lazy database lookup for a set of objects.
     """
     def __init__(self, model=None, using=None, index=None, type=None, conn=None, es_url=None, es_kwargs=None):
+        from .odm import model_factory
         if model is None and index and type:
-            from .odm import model_factory
-            model = model_factory()
-        self.model = model
+            model = ElasticSearchModel
+        self.model = model_factory(model)
         es_kwargs = es_kwargs or {}
         if es_url:
             es_kwargs.update(server=es_url)
@@ -299,7 +299,7 @@ class QuerySet(object):
         Creates a new object with the given kwargs, saving it to the database
         and returning the created object.
         """
-        obj = self.model(**kwargs)
+        obj = self.model(self.connection, kwargs)
         obj._meta.connection = self.connection
         obj.save(force_insert=True, using=self.index)
         return obj
@@ -371,7 +371,7 @@ class QuerySet(object):
         except self.model.DoesNotExist:
             params = dict([(k, v) for k, v in kwargs.items() if '__' not in k])
             params.update(defaults)
-            obj = self.model(**params)
+            obj = self.model(self.connection, params)
             meta = obj.get_meta()
             meta.connection = self.connection
             meta.index=self.index
