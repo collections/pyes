@@ -12,22 +12,15 @@ import copy
 
 # The maximum number of items to display in a QuerySet.__repr__
 from .filters import ANDFilter, ORFilter, NotFilter, Filter, TermsFilter, TermFilter, RangeFilter, ExistsFilter
+from .query import MatchAllQuery, BoolQuery, FilteredQuery, Search
+from .exceptions import DoesNotExist, MultipleObjectsReturned
 from .facets import Facet, TermFacet
 from .models import ElasticSearchModel
-from .query import MatchAllQuery, BoolQuery, FilteredQuery, Search
-from .utils import ESRange
 from .utils.compat import integer_types
+from .utils import ESRange
 
 REPR_OUTPUT_SIZE = 20
 
-class DoesNotExist(Exception):
-    pass
-ElasticSearchModel.DoesNotExist = DoesNotExist
-
-
-class MultipleObjectsReturned(Exception):
-    pass
-ElasticSearchModel.MultipleObjectsReturned = MultipleObjectsReturned
 
 def generate_model(index, doc_type, es_url=None, es_kwargs={}):
     MyModel = type('MyModel', (ElasticSearchModel,), {})
@@ -57,10 +50,10 @@ class QuerySet(object):
         self._filters = []
         self._facets = []
         self._ordering = []
-        self._fields = [] #fields to load
-        self._size=None
-        self._start=0
-        self._result_cache = None #hold the resultset
+        self._fields = []  # fields to load
+        self._size = None
+        self._start = 0
+        self._result_cache = None  # hold the resultset
 
     def _clear_ordering(self):
         #reset ordering
@@ -283,16 +276,14 @@ class QuerySet(object):
         if num == 1:
             return clone._result_cache[0]
         if not num:
-            raise self.model.DoesNotExist(
-                "%s matching query does not exist. "
-                "Lookup parameters were %s" %
+            raise DoesNotExist(
+                "%s matching query does not exist. Lookup parameters were %s"
+                % (self.model.__class__.__name__, kwargs))
                 #(self.model._meta.object_name, kwargs))
-                (self.model.__class__.__name__, kwargs))
-        raise self.model.MultipleObjectsReturned(
-            "get() returned more than one %s -- it returned %s! "
-            "Lookup parameters were %s" %
+        raise MultipleObjectsReturned(
+            "get() returned more than one %s -- it returned %s! Lookup parameters were %s"
+            % (self.model.__class__.__name__, num, kwargs))
             #(self.model._meta.object_name, num, kwargs))
-            (self.model.__class__.__name__, num, kwargs))
 
     def create(self, **kwargs):
         """
@@ -361,14 +352,13 @@ class QuerySet(object):
         Returns a tuple of (object, created), where created is a boolean
         specifying whether an object was created.
         """
-        assert kwargs, \
-                'get_or_create() must be passed at least one keyword argument'
+        assert kwargs, 'get_or_create() must be passed at least one keyword argument'
         defaults = kwargs.pop('defaults', {})
         lookup = kwargs.copy()
         #TODO: check fields
         try:
             return self.get(**lookup), False
-        except self.model.DoesNotExist:
+        except DoesNotExist:
             params = dict([(k, v) for k, v in kwargs.items() if '__' not in k])
             params.update(defaults)
             obj = self.model(self.connection, params)
@@ -384,7 +374,7 @@ class QuerySet(object):
         Returns the latest object, according to the model's 'get_latest_by'
         option or optional given field_name.
         """
-        latest_by = field_name or "_id"#self.model._meta.get_latest_by
+        latest_by = field_name or "_id"  # self.model._meta.get_latest_by
         assert bool(latest_by), "latest() requires either a field_name parameter or 'get_latest_by' in the model"
         obj = self._clone()
         obj._size=1
@@ -464,7 +454,7 @@ class QuerySet(object):
         search.fields=fields
         if flat:
             return self.connection.search(search, indices=self.index, doc_types=self.type,
-                                              model=lambda x,y: y.get("fields", {}).get(fields[0], None))
+                                          model=lambda x,y: y.get("fields", {}).get(fields[0], None))
 
         return self.connection.search(search, indices=self.index, doc_types=self.type)
 
@@ -475,15 +465,15 @@ class QuerySet(object):
         """
 
         assert kind in ("month", "year", "day", "week", "hour", "minute"), \
-                "'kind' must be one of 'year', 'month', 'day', 'week', 'hour' and 'minute'."
+            "'kind' must be one of 'year', 'month', 'day', 'week', 'hour' and 'minute'."
         assert order in ('ASC', 'DESC'), \
-                "'order' must be either 'ASC' or 'DESC'."
+            "'order' must be either 'ASC' or 'DESC'."
 
         search= self._build_search()
         search.facet.reset()
         search.facet.add_date_facet(name=field_name.replace("__", "."),
-                 field=field_name, interval=kind)
-        search.size=0
+                                    field=field_name, interval=kind)
+        search.size = 0
         resulset = self.connection.search(search, indices=self.index, doc_types=self.type)
         resulset.fix_facets()
         entries = []

@@ -30,8 +30,13 @@ __all__ = [
     "DocumentAlreadyExistsException",
     "TypeMissingException",
     "BulkOperationException",
-    "FieldValidationException"
+    "ElasticModelException",
+    "FieldValidationException",
+    "QuerySetException",
+    "DoesNotExist",
+    "MultipleObjectsReturned",
 ]
+
 
 class ESPendingDeprecationWarning(PendingDeprecationWarning):
     pass
@@ -148,5 +153,22 @@ class BulkOperationException(ElasticSearchException, EqualityComparableUsingAttr
         self.errors = errors
         self.bulk_result = bulk_result
 
-class FieldValidationException(ElasticSearchException):
+
+class ElasticModelException(Exception):
+    pass
+
+
+class FieldValidationException(ElasticModelException):
+    pass
+
+
+class QuerySetException(Exception):
+    pass
+
+
+class DoesNotExist(QuerySetException):
+    pass
+
+
+class MultipleObjectsReturned(QuerySetException):
     pass

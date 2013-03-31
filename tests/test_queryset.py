@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 from estestcase import ESTestCase
-from pyes.queryset import DoesNotExist, generate_model
+from pyes.exceptions import DoesNotExist
+from pyes.queryset import generate_model
 from datetime import datetime
 
 class QuerySetTests(ESTestCase):

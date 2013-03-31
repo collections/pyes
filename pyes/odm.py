@@ -1,5 +1,5 @@
 """Object Document Mapper"""
-from queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
+from queryset import QuerySet
 from models import ElasticSearchModel, DotDict
 from mappings import AbstractField
 
@@ -18,10 +18,7 @@ class ModelMeta(type):
         if cls.Meta.index and cls.Meta.type:
             mcs._registered_models.setdefault(cls.Meta.index, {})
             mcs._registered_models[cls.Meta.index][cls.Meta.type] = cls
-            cls.objects = QuerySet(model_factory(cls))
-            # Temporary hacks needed to get QuerySet to cooperate
-            cls._index = cls.Meta.index
-            cls._type = cls.Meta.type
+            cls.objects = QuerySet(model_factory(cls), index=cls.Meta.index, type=cls.Meta.type)
 
         return cls
 
@@ -44,8 +41,6 @@ def model_factory(default_cls=ElasticSearchModel):
             ins = default_cls(conn)
             ins.update(data)
         return ins
-    _model_factory.DoesNotExist = default_cls.DoesNotExist
-    _model_factory.MultipleObjectsReturned = default_cls.MultipleObjectsReturned
     return _model_factory
 
 
@@ -60,8 +55,6 @@ def register_model_mappings(conn):
 class Model(ElasticSearchModel):
     __metaclass__ = ModelMeta
 
-    DoesNotExist = DoesNotExist
-    MultipleObjectsReturned = MultipleObjectsReturned
     objects = None  # Will be set by metaclass to be a queryset
     default_connection = None
 
