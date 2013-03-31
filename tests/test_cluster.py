@@ -57,7 +57,8 @@ class ClusterTestCase(ESTestCase):
 
         # We should also make sure that at least /some/ of the keys are
         # the values that we'd expect
-        self.assertEqual(result['cluster_name'], 'elasticsearch')
+        self.assertIn('elasticsearch', result['cluster_name'])
+
         # Make sure we see the number of active shards we expect
         #self.assertEqual(result['active_shards'], 24)
 

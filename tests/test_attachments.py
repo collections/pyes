@@ -33,19 +33,22 @@ class QueryAttachmentTestCase(ESTestCase):
     def setUp(self):
         super(QueryAttachmentTestCase, self).setUp()
         mapping = {
-            "attachment": {"type": "attachment",
-                           'fields': {
-                               "file": {'store': "yes"},
-                               "date": {'store': "yes"},
-                               "author": {'store': "yes"},
-                               "title": {'store': "yes", "term_vector": "with_positions_offsets"},
-                               "attachment": {'store': "yes"},
-                               }
+            'attachment': {
+                'type': 'attachment',
+                'fields': {
+                    'file': {'store': 'yes'},
+                    'date': {'store': 'yes'},
+                    'author': {'store': 'yes'},
+                    'title': {'store': 'yes', 'term_vector': 'with_positions_offsets'},
+                    'attachment': {'store': 'yes'},
+                }
             },
-            'uuid': {'boost': 1.0,
-                     'index': 'not_analyzed',
-                     'store': 'yes',
-                     'type': u'string'}
+            'uuid': {
+                'boost': 1.0,
+                'index': 'not_analyzed',
+                'store': 'yes',
+                'type': u'string'
+            }
         }
         #        mapping = {
         #            self.document_type: {
