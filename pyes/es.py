@@ -144,7 +144,7 @@ class ES(object):
         :param basic_auth: Dictionary with 'username' and 'password' keys for HTTP Basic Auth.
         :param model: used to objectify the dictinary. If None, the raw dict is returned.
 
-
+        :param log_curl: if truthy, this will log every query at DEBUG level
         :param dump_curl: If truthy, this will dump every query to a curl file.  If
         this is set to a string value, it names the file that output is sent
         to.  Otherwise, it should be set to an object with a write() method,

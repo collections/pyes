@@ -39,5 +39,5 @@ except ImportError:
 try:
     #useful for additional features for django users
     from .djangoutils import *
-except ImportError:
+except BaseException:
     pass

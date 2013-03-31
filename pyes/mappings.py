@@ -45,7 +45,9 @@ class AbstractField(object):
                  analyzer=None,
                  index_analyzer=None,
                  search_analyzer=None,
-                 name=None):
+                 name=None,
+                 required=False,
+                 default=None):
         self.store = to_bool(store)
         self.boost = boost
         self.term_vector = term_vector
@@ -59,6 +61,8 @@ class AbstractField(object):
         self.search_analyzer = search_analyzer
         self.name = name
         self.path = path
+        self.required = required
+        self.default = default
 
     def as_dict(self):
         result = {"type": self.type,
@@ -98,6 +102,26 @@ class AbstractField(object):
             data["store"]=to_bool(data["store"])
         var_name = "prop_"+self.name
         return var_name, var_name+" = "+self.__class__.__name__+"(name=%r, "%self.name+", ".join(["%s=%r"%(k,v) for k,v in data.items()])+")"
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        value = instance.__getitem__(self.name, None)
+        if value is None and self.default is not None:
+            value = self.default() if callable(self.default) else self.default
+        return value
+
+    def __set__(self, instance, value):
+        instance.__setitem__(self.name, value)
+        # Perhaps mark as change here
+
+    def validate(self, obj):
+        if self.required:
+            try:
+                obj.__getitem__(self.name)
+            except KeyError:
+                raise Exception('Required field %s is missing' % self)
+
 
 class StringField(AbstractField):
     def __init__(self, null_value=None, include_in_all=None, *args, **kwargs):
