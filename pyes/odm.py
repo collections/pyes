@@ -1,7 +1,7 @@
 """Object Document Mapper"""
-from queryset import QuerySet
-from models import ElasticSearchModel, DotDict
+from models import ElasticSearchModel
 from mappings import AbstractField
+from exceptions import ElasticModelException
 
 
 class ModelMeta(type):
@@ -13,12 +13,15 @@ class ModelMeta(type):
         for name, field in ((k, getattr(cls, k)) for k in dir(cls)):
             if isinstance(field, AbstractField):
                 field.name = field.name or name
+                if field.name in ['_source', 'fields']:
+                    raise ElasticModelException('Field name %s is reserved. Invalid %s' % (name, field))
                 cls._fields[name] = field
 
         if cls.Meta.index and cls.Meta.type:
             mcs._registered_models.setdefault(cls.Meta.index, {})
             mcs._registered_models[cls.Meta.index][cls.Meta.type] = cls
-            cls.objects = QuerySet(model_factory(cls), index=cls.Meta.index, type=cls.Meta.type)
+            from queryset import QuerySet
+            cls.objects = QuerySet(cls)
 
         return cls
 
@@ -27,20 +30,24 @@ class ModelMeta(type):
         mcs._registered_models.get(index, {}).get(type, None)
 
 
-def model_factory(default_cls=ElasticSearchModel):
+def model_factory(default_cls):
     def _model_factory(conn=None, data=None):
-        data = data or {}
         if '_source' in data or 'fields' in data:
-            cls = ModelMeta.get_registered_model(data.get('_index', None), data.get('_type', None)) or default_cls
-            ins = cls(conn)
-            ins.update(data.pop("_source", DotDict()))
-            ins.update(data.pop("fields", {}))
-            ins._meta = DotDict([(k.lstrip("_"), v) for k, v in data.items()])
-            ins._meta.parent = ins.pop("_parent", None)
+            # Assume data to be be in Elasticsearch API format if '_source' or 'fields' exists
+            attrs = data.pop('_source', {})
+            attrs.update(data.pop('fields', {}))
+            meta = {k.lstrip('_'): v for k, v in data.iteritems()}
+            meta['parent'] = attrs.pop('_parent', None)
         else:
-            ins = default_cls(conn)
-            ins.update(data)
+            # Else assume data to be attrs provided by user
+            meta = {}
+            attrs = data
+
+        cls = ModelMeta.get_registered_model(meta.get('index', None), meta.get('type', None)) or default_cls
+        ins = cls(conn, **attrs)
+        ins._meta.update(meta)
         return ins
+    _model_factory.default_cls = default_cls
     return _model_factory
 
 

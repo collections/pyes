@@ -16,6 +16,7 @@ from .query import MatchAllQuery, BoolQuery, FilteredQuery, Search
 from .exceptions import DoesNotExist, MultipleObjectsReturned
 from .facets import Facet, TermFacet
 from .models import ElasticSearchModel
+from .odm import model_factory, Model
 from .utils.compat import integer_types
 from .utils import ESRange
 
@@ -32,20 +33,27 @@ class QuerySet(object):
     """
     Represents a lazy database lookup for a set of objects.
     """
-    def __init__(self, model=None, using=None, index=None, type=None, conn=None, es_url=None, es_kwargs=None):
-        from .odm import model_factory
-        if model is None and index and type:
-            model = ElasticSearchModel
-        self.model = model_factory(model)
+    def __init__(self, model=ElasticSearchModel, using=None, index=None, type=None, conn=None, es_url=None, es_kwargs=None):
+        self.model = model
+        try:
+            if issubclass(model, ElasticSearchModel):
+                self.model = model_factory(model)
+            if issubclass(model, Model):
+                conn = conn or model.default_connection
+                index = index or model.Meta.index
+                type = type or model.Meta.type
+        except TypeError:
+            pass
+
         es_kwargs = es_kwargs or {}
         if es_url:
             es_kwargs.update(server=es_url)
         from .es import ES
         self.connection = conn or ES(**es_kwargs)
-
-        # EmptyQuerySet instantiates QuerySet with model as None
         self.index = using or index
         self.type = type
+
+        # EmptyQuerySet instantiates QuerySet with model as None
         self._queries = []
         self._filters = []
         self._facets = []

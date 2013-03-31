@@ -24,7 +24,7 @@ from .exceptions import ElasticSearchException, ReduceSearchPhaseException, \
 from .helpers import SettingsBuilder
 from .managers import Indices, Cluster
 from .mappings import Mapper
-from .models import DotDict, ListBulker
+from .models import DotDict, ListBulker, ElasticSearchModel
 from .odm import model_factory
 from .query import Search, Query, MatchAllQuery
 from .rivers import River
@@ -121,7 +121,7 @@ class ES(object):
                  default_types=None,
                  log_curl=False,
                  dump_curl=False,
-                 model=model_factory(),
+                 model=model_factory(ElasticSearchModel),
                  basic_auth=None,
                  raise_on_bulk_item_failure=False,
                  document_object_field=None,
@@ -1099,15 +1099,12 @@ class ES(object):
         """
         Create a stub object to be manipulated
         """
-        data = data or {}
-        obj = self.model()
-        obj._meta.index = index
-        obj._meta.type = doc_type
-        obj._meta.connection = self
-        if id:
-            obj._meta.id = id
-        if data:
-            obj.update(data)
+        obj = self.model(self, {
+            '_index': index,
+            '_type': doc_type,
+            '_id': id,
+            '_source': data or {}
+        })
         if vertex:
             obj.force_vertex()
         return obj
