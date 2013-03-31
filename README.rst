@@ -90,22 +90,18 @@ TODO
 
 
 Contributing and Testing
----
+----
 
 To develop and contribute to `pyes`, clone this repository, then run `pip install -r requirements_develop.txt`
 In order to run the tests, make sure you first install the following `elasticsearch` plugins
 
-- :mapper-attachment: https://github.com/elasticsearch/elasticsearch-mapper-attachments
-- :lang-js: https://github.com/elasticsearch/elasticsearch-lang-javascript (1.2.0)
-- :lang-python: https://github.com/elasticsearch/elasticsearch-lang-python (1.1.0)
+:attachment: https://github.com/elasticsearch/elasticsearch-mapper-attachments
+:lang-js: https://github.com/elasticsearch/elasticsearch-lang-javascript (1.2.0)
+:lang-python: https://github.com/elasticsearch/elasticsearch-lang-python (1.1.0)
 
-NODE: Be particularly careful about the version of the plugin you are installing. It must match the correct version of
-elasticsearch you have installed. Installing a wrong version of the plugin could cause unexpected errors that are
-extremely hard to debug. When in doubt, run elasticsearch in foreground mode for easier exception trance and debugging.
+NODE: Be particularly careful about the version of the plugin you are installing. It must match the correct version of elasticsearch you have installed. Installing a wrong version of the plugin could cause unexpected errors that are extremely hard to debug. When in doubt, run elasticsearch in foreground mode for easier exception trance and debugging.
 
-To actually run the tests, run `nosetests` from the root directory of the repo. Before and after you branch and add your
- changes, make sure all the tests pass. Please also add test cases for each feature you add and document the necessary
- environment requirements to run the test case.
+To actually run the tests, run `nosetests` from the root directory of the repo. Before and after you branch and add your changes, make sure all the tests pass. Please also add test cases for each feature you add and document the necessary environment requirements to run the test case.
 
 
 License
