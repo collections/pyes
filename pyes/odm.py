@@ -2,7 +2,7 @@
 from models import ElasticSearchModel
 from mappings import AbstractField
 from exceptions import ElasticModelException
-
+from queryset import QuerySet
 
 class ModelMeta(type):
     _registered_models = {} # nested dict. [index][type] -> cls
@@ -21,7 +21,6 @@ class ModelMeta(type):
             # TODO: Error checking here to make sure type and index are both defined on subclass!
             mcs._registered_models.setdefault(cls.Meta.index, {})
             mcs._registered_models[cls.Meta.index][cls.Meta.type] = cls
-            from queryset import QuerySet
             cls.objects = QuerySet(cls)
 
         return cls
@@ -63,8 +62,12 @@ def register_model_mappings(conn):
 class Model(ElasticSearchModel):
     __metaclass__ = ModelMeta
 
-    objects = None  # Will be set by metaclass to be a queryset
+    objects = QuerySet(None)  # For IDE auto-completion. Will be set by metaclass to be a class specific queryset
     default_connection = None
+
+    class Meta:
+        index = None
+        type = None
 
     def __init__(self, conn=None, *args, **kwargs):
         super(Model, self).__init__(conn, *args, **kwargs)
@@ -89,6 +92,6 @@ class Model(ElasticSearchModel):
             field.validate(self)
         super(Model, self).save(*args, **kwargs)
 
-    class Meta:
-        index = None
-        type = None
+    @classmethod
+    def get_by_id(cls, id):
+        return cls.default_connection.get(cls.Meta.index, cls.Meta.type, id)

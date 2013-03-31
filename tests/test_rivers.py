@@ -22,6 +22,7 @@ class RiversTestCase(ESTestCase):
         Testing deleting a river
         """
         test_river = CouchDBRiver(index_name='text_index', index_type='test_type')
+        self.conn.create_river(test_river, river_name='test_index')
         result = self.conn.delete_river(test_river, river_name='test_index')
         print result
         self.assertResultContains(result, {'ok': True})
@@ -40,7 +41,7 @@ class RiversTestCase(ESTestCase):
         Delete RabbitMQ river
         """
         test_river = RabbitMQRiver(index_name='text_index', index_type='test_type')
-        result = self.conn.create_river(test_river, river_name='test_index')
+        self.conn.create_river(test_river, river_name='test_index')
         result = self.conn.delete_river(test_river, river_name='test_index')
         print result
         self.assertResultContains(result, {'ok': True})
@@ -59,7 +60,7 @@ class RiversTestCase(ESTestCase):
         Delete Twitter river
         """
         test_river = TwitterRiver('test', 'test', index_name='text_index', index_type='status')
-        result = self.conn.create_river(test_river, river_name='test_index')
+        self.conn.create_river(test_river, river_name='test_index')
         result = self.conn.delete_river(test_river, river_name='test_index')
         print result
         self.assertResultContains(result, {'ok': True})
@@ -74,6 +75,10 @@ class RiversTestCase(ESTestCase):
         result = self.conn.create_river(test_river, river_name='test_index')
         print result
         self.assertResultContains(result, {'ok': True})
+
+    def tearDown(self):
+        super(RiversTestCase, self).tearDown()
+        self.conn.delete_index_if_exists('_river')
 
 
 if __name__ == "__main__":

@@ -16,7 +16,6 @@ from .query import MatchAllQuery, BoolQuery, FilteredQuery, Search
 from .exceptions import DoesNotExist, MultipleObjectsReturned
 from .facets import Facet, TermFacet
 from .models import ElasticSearchModel
-from .odm import model_factory, Model
 from .utils.compat import integer_types
 from .utils import ESRange
 
@@ -25,7 +24,7 @@ REPR_OUTPUT_SIZE = 20
 
 def generate_model(index, doc_type, es_url=None, es_kwargs={}):
     MyModel = type('MyModel', (ElasticSearchModel,), {})
-    MyModel.objects = QuerySet(MyModel, index=index, type=doc_type, es_url=es_url, es_kwargs=es_kwargs)
+    MyModel.objects = QuerySet(MyModel, index=index, doc_type=doc_type, es_url=es_url, es_kwargs=es_kwargs)
     return MyModel
 
 
@@ -33,25 +32,24 @@ class QuerySet(object):
     """
     Represents a lazy database lookup for a set of objects.
     """
-    def __init__(self, model=ElasticSearchModel, using=None, index=None, type=None, conn=None, es_url=None, es_kwargs=None):
+    def __init__(self, model=ElasticSearchModel, using=None, index=None, doc_type=None, conn=None, es_url=None, es_kwargs=None):
         self.model = model
-        try:
+        if model is not None and isinstance(model, type):  # model is a class, not function
+            from .odm import model_factory, Model
             if issubclass(model, ElasticSearchModel):
                 self.model = model_factory(model)
             if issubclass(model, Model):
                 conn = conn or model.default_connection
                 index = index or model.Meta.index
-                type = type or model.Meta.type
-        except TypeError:
-            pass
+                doc_type = doc_type or model.Meta.type
 
-        es_kwargs = es_kwargs or {}
+        self.es_kwargs = es_kwargs or {}
         if es_url:
-            es_kwargs.update(server=es_url)
-        from .es import ES
-        self.connection = conn or ES(**es_kwargs)
+            self.es_kwargs.update(server=es_url)
+        if conn:
+            self.connection = conn
         self.index = using or index
-        self.type = type
+        self.type = doc_type
 
         # EmptyQuerySet instantiates QuerySet with model as None
         self._queries = []
@@ -66,6 +64,17 @@ class QuerySet(object):
     def _clear_ordering(self):
         #reset ordering
         self._ordering=[]
+
+    @property
+    def connection(self):
+        if not hasattr(self, '_connection'):
+            from .es import ES
+            self.connection = ES(**self.es_kwargs)
+        return getattr(self, '_connection', None)
+
+    @connection.setter
+    def connection(self, conn):
+        self._connection = conn
         
     ########################
     # PYTHON MAGIC METHODS #
@@ -755,7 +764,7 @@ class QuerySet(object):
     def _clone(self, klass=None, setup=False, **kwargs):
         if klass is None:
             klass = self.__class__
-        c = klass(model=self.model, using=self.index, index=self.index, type=self.type, conn=self.connection)
+        c = klass(model=self.model, using=self.index, index=self.index, doc_type=self.type, conn=self.connection)
         #copy filters/queries/facet????
         c.__dict__.update(kwargs)
         c._queries=list(self._queries)

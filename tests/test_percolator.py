@@ -70,6 +70,7 @@ class PercolatorTestCase(ESTestCase):
         self.conn.delete_percolator('test-index', 'test-perc1')
         self.conn.delete_percolator('test-index', 'test-perc2')
         self.conn.delete_percolator('test-index', 'test-perc3')
+        self.conn.delete_index_if_exists('_percolator')
         super(PercolatorTestCase, self).tearDown()
 
 
