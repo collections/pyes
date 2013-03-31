@@ -30,23 +30,14 @@ class DotDict(dict):
 
 
 class ElasticSearchModel(DotDict):
-    def __init__(self, *args, **kwargs):
-        from pyes import ES
-        self._meta = DotDict()
+    def __init__(self, conn=None, *args, **kwargs):
+        super(ElasticSearchModel, self).__init__(*args, **kwargs)
+        self._meta = DotDict(connection=conn)
         self.__initialised = True
-        if len(args) == 2 and isinstance(args[0], ES):
-            item = args[1]
-            self.update(item.pop("_source", DotDict()))
-            self.update(item.pop("fields", {}))
-            self._meta = DotDict([(k.lstrip("_"), v) for k, v in item.items()])
-            self._meta.parent = self.pop("_parent", None)
-            self._meta.connection = args[0]
-        else:
-            self.update(dict(*args, **kwargs))
 
     def __setattr__(self, key, value):
-        if not self.__dict__.has_key(
-            '_ElasticSearchModel__initialised'):  # this test allows attributes to be set in the __init__ method
+        # this test allows attributes to be set in the __init__ method
+        if not self.__dict__.has_key('_ElasticSearchModel__initialised'):
             return dict.__setattr__(self, key, value)
         elif self.__dict__.has_key(key):       # any normal attributes are handled normally
             dict.__setattr__(self, key, value)

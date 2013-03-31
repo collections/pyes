@@ -41,7 +41,8 @@ class QuerySet(object):
     """
     def __init__(self, model=None, using=None, index=None, type=None, conn=None, es_url=None, es_kwargs=None):
         if model is None and index and type:
-            model = ElasticSearchModel
+            from .odm import model_factory
+            model = model_factory()
         self.model = model
         es_kwargs = es_kwargs or {}
         if es_url:

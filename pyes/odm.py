@@ -2,8 +2,7 @@
 from queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from models import ElasticSearchModel, DotDict
 from mappings import AbstractField
-from copy import deepcopy
-from pyes import logger
+
 
 class ModelMeta(type):
     _registered_models = {} # nested dict. [index][type] -> cls
@@ -19,7 +18,7 @@ class ModelMeta(type):
         if cls.Meta.index and cls.Meta.type:
             mcs._registered_models.setdefault(cls.Meta.index, {})
             mcs._registered_models[cls.Meta.index][cls.Meta.type] = cls
-            cls.objects = QuerySet(cls)
+            cls.objects = QuerySet(model_factory(cls))
             # Temporary hacks needed to get QuerySet to cooperate
             cls._index = cls.Meta.index
             cls._type = cls.Meta.type
@@ -31,19 +30,26 @@ class ModelMeta(type):
         mcs._registered_models.get(index, {}).get(type, None)
 
 
-def model_factory(conn, data):
-    cls = ModelMeta.get_registered_model(data._index, data._type)
-    if not cls:
-        return ElasticSearchModel(conn, data)
+def model_factory(default_cls=ElasticSearchModel):
+    def _model_factory(*args, **kwargs):
+        from .es import ES
+        if len(args) == 2 and isinstance(args[0], ES):
+            item = args[1]
+            cls = ModelMeta.get_registered_model(item._index, item._type) or default_cls
+            ins = cls()
+            ins.update(item.pop("_source", DotDict()))
+            ins.update(item.pop("fields", {}))
+            ins._meta = DotDict([(k.lstrip("_"), v) for k, v in item.items()])
+            ins._meta.parent = ins.pop("_parent", None)
+            ins._meta.connection = args[0]
+        else:
+            ins = default_cls()
+            ins.update(dict(*args, **kwargs))
+        return ins
+    return _model_factory
 
-    ins = cls(conn)
-    ins.update(data.pop("_source", DotDict()))
-    ins.update(data.pop("fields", {}))
-    ins._meta = DotDict([(k.lstrip("_"), v) for k, v in data.items()])
-    ins._meta.parent = ins.pop("_parent", None)
-    return ins
 
-def put_model_mappings(conn):
+def register_model_mappings(conn):
     for index_name, index_types in ModelMeta._registered_models.iteritems():
         conn.indices.create_index_if_missing(index_name)
         for type_name, cls in index_types.iteritems():
@@ -60,11 +66,10 @@ class Model(ElasticSearchModel):
     default_connection = None
 
     def __init__(self, conn=None, *args, **kwargs):
-        self._meta = DotDict(deepcopy(self.Meta.__dict__))
-        self._meta.connection = conn or self.default_connection
-        self.__initialised = True
-        self.update(dict(*args, **kwargs))
-        assert self._meta.connection
+        super(Model, self).__init__(conn, *args, **kwargs)
+        self._meta.connection = self._meta.connection or self.default_connection
+        for k, v in self.Meta.__dict__.iteritems():
+            self._meta.setdefault(k, v)
 
     def save(self, *args, **kwargs):
         for field in self._fields.values():
