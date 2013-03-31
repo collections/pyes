@@ -34,10 +34,28 @@ check_values = {
     'store': ['yes', 'no'],
     'index_analyzer': [],
     'search_analyzer': [],
-    }
+}
 
+class ModelField(object):
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        value = instance.get(self.name, None)
+        if value is None and self.default is not None:
+            value = self.default() if callable(self.default) else self.default
+        return value
 
-class AbstractField(object):
+    def __set__(self, instance, value):
+        instance[self.name] = value
+        # Perhaps mark as change here
+
+    def validate(self, obj):
+        if self.required:
+            value = obj.get(self.name, None)
+            if not value:
+                raise FieldValidationException('Required field %s is missing' % self)
+
+class AbstractField(ModelField):
     def __init__(self, index="not_analyzed", store="no", boost=1.0,
                  term_vector="no", omit_norms=True,
                  omit_term_freq_and_positions=True,
@@ -103,25 +121,6 @@ class AbstractField(object):
             data["store"]=to_bool(data["store"])
         var_name = "prop_"+self.name
         return var_name, var_name+" = "+self.__class__.__name__+"(name=%r, "%self.name+", ".join(["%s=%r"%(k,v) for k,v in data.items()])+")"
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        value = instance.__getitem__(self.name, None)
-        if value is None and self.default is not None:
-            value = self.default() if callable(self.default) else self.default
-        return value
-
-    def __set__(self, instance, value):
-        instance.__setitem__(self.name, value)
-        # Perhaps mark as change here
-
-    def validate(self, obj):
-        if self.required:
-            try:
-                obj.__getitem__(self.name)
-            except KeyError:
-                raise FieldValidationException('Required field %s is missing' % self)
 
 
 class StringField(AbstractField):
@@ -279,7 +278,7 @@ class BooleanField(AbstractField):
         return result
 
 
-class MultiField(object):
+class MultiField(ModelField):
     def __init__(self, name, type=None, path=None, fields=None):
         self.name = name
         self.type = "multi_field"
@@ -306,7 +305,7 @@ class MultiField(object):
         return result
 
 
-class AttachmentField(object):
+class AttachmentField(ModelField):
     """An attachment field.
 
     Requires the mapper-attachments plugin to be installed to be used.
@@ -328,7 +327,7 @@ class AttachmentField(object):
         return result
 
 
-class ObjectField(object):
+class ObjectField(ModelField):
     def __init__(self, name=None, type=None, path=None, properties=None,
                  dynamic=None, enabled=None, include_in_all=None, dynamic_templates=None,
                  include_in_parent=None, include_in_root=None,

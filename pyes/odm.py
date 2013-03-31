@@ -18,6 +18,7 @@ class ModelMeta(type):
                 cls._fields[name] = field
 
         if cls.Meta.index and cls.Meta.type:
+            # TODO: Error checking here to make sure type and index are both defined on subclass!
             mcs._registered_models.setdefault(cls.Meta.index, {})
             mcs._registered_models[cls.Meta.index][cls.Meta.type] = cls
             from queryset import QuerySet
@@ -70,6 +71,18 @@ class Model(ElasticSearchModel):
         self._meta.connection = self._meta.connection or self.default_connection
         for k, v in self.Meta.__dict__.iteritems():
             self._meta.setdefault(k, v)
+        for name, field in self._fields.iteritems():
+            if field.default is not None:
+                self[name] = field.__get__(self, self.__class__)
+
+    def __getattr__(self, attr):
+        return self[attr]
+
+    def __setattr__(self, key, value):
+        if key in self._fields:
+            self.__setitem__(key, value)
+        else:
+            dict.__setattr__(self, key, value)
 
     def save(self, *args, **kwargs):
         for field in self._fields.values():
