@@ -81,9 +81,11 @@ class ElasticSearchModel(DotDict):
         return id
 
     def reload(self):
+        from .odm import model_factory
         meta = self._meta
         conn = meta['connection']
-        res = conn.get(meta.index, meta.type, meta["id"])
+        model = model_factory(ElasticSearchModel, force_default=True)
+        res = conn.get(meta.index, meta.type, meta["id"], model=model)
         self.update(res)
 
 

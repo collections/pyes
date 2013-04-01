@@ -30,25 +30,29 @@ class ModelMeta(type):
     def get_registered_model(mcs, index, type):
         return mcs._registered_models.get(index, {}).get(type, None)
 
+def parse_data(data):
+    "Return 3 tuple, class, attrs and meta. Useful for custom model factories"
+    if '_source' in data or 'fields' in data:
+        # Assume data to be be in Elasticsearch API format if '_source' or 'fields' exists
+        attrs = data.pop('_source', {})
+        attrs.update(data.pop('fields', {}))
+        meta = {k.lstrip('_'): v for k, v in data.iteritems()}
+        meta['parent'] = attrs.pop('_parent', None)
+    else:
+        # Else assume data to be attrs provided by user
+        meta = {}
+        attrs = data
 
-def model_factory(default_cls):
+    cls = ModelMeta.get_registered_model(meta.get('index', None), meta.get('type', None))
+    return cls, attrs, meta
+
+def model_factory(default_cls, force_default=False):
     def _model_factory(conn=None, data=None):
-        if '_source' in data or 'fields' in data:
-            # Assume data to be be in Elasticsearch API format if '_source' or 'fields' exists
-            attrs = data.pop('_source', {})
-            attrs.update(data.pop('fields', {}))
-            meta = {k.lstrip('_'): v for k, v in data.iteritems()}
-            meta['parent'] = attrs.pop('_parent', None)
-        else:
-            # Else assume data to be attrs provided by user
-            meta = {}
-            attrs = data
-
-        cls = ModelMeta.get_registered_model(meta.get('index', None), meta.get('type', None)) or default_cls
+        cls, attrs, meta = parse_data(data)
+        cls = default_cls if force_default or not cls else cls
         ins = cls(conn, **attrs)
         ins._meta.update(meta)
         return ins
-    _model_factory.default_cls = default_cls
     return _model_factory
 
 
