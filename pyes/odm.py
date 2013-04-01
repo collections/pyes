@@ -4,6 +4,10 @@ from mappings import *
 from exceptions import ElasticModelException
 from queryset import QuerySet
 
+# Let's prevent people from shooting themselves in the foot as best we can
+forbidden_names = ['_uid', '_id', '_type', '_source', '_all', '_analyzer', '_boost',
+                   '_parent', '_routing', '_index', '_size', '_timestamp', '_ttl', 'fields']
+
 class ModelMeta(type):
     _registered_models = {} # nested dict. [index][type] -> cls
 
@@ -14,7 +18,7 @@ class ModelMeta(type):
             for name, field in clazz.__dict__.iteritems():
                 if isinstance(field, ModelField):
                     field.name = field.name or name
-                    if field.name in ['_source', 'fields']:
+                    if field.name in forbidden_names:
                         raise ElasticModelException('Field name %s is reserved. Invalid %s' % (name, field))
                     cls._fields[name] = field
 
