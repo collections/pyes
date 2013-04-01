@@ -1,6 +1,6 @@
 """Object Document Mapper"""
 from models import ElasticSearchModel
-from mappings import ModelField
+from mappings import *
 from exceptions import ElasticModelException
 from queryset import QuerySet
 
@@ -28,7 +28,7 @@ class ModelMeta(type):
 
     @classmethod
     def get_registered_model(mcs, index, type):
-        mcs._registered_models.get(index, {}).get(type, None)
+        return mcs._registered_models.get(index, {}).get(type, None)
 
 
 def model_factory(default_cls):
@@ -79,14 +79,11 @@ class Model(ElasticSearchModel):
             if field.default is not None:
                 self[name] = field.__get__(self, self.__class__)
 
+    # Reverse attribute getters and setters changed by DotDict
+    __setattr__ = dict.__setattr__
+    __delattr__ = dict.__delattr__
     def __getattr__(self, attr):
-        return self[attr]
-
-    def __setattr__(self, key, value):
-        if key in self._fields:
-            self.__setitem__(key, value)
-        else:
-            dict.__setattr__(self, key, value)
+        raise AttributeError
 
     def save(self, *args, **kwargs):
         for field in self._fields.values():
@@ -97,3 +94,28 @@ class Model(ElasticSearchModel):
     @classmethod
     def get_by_id(cls, id):
         return cls.default_connection.get(cls.Meta.index, cls.Meta.type, id)
+
+
+class ToManyField(StringField):
+    def __init__(self, ordered=True, unique=False, **kwargs):
+        super(ToManyField, self).__init__(**kwargs)
+        self.ordered = ordered
+        self.unique = unique
+        if self.ordered != True or self.unique != False:
+            raise NotImplementedError
+
+    def __get__(self, instance, owner):
+        if not hasattr(instance, '_' + self.name):
+            conn = instance._meta.connection
+            ids = instance.get(self.name, None)
+            ids = [tuple(i.split('/', 2)) for i in ids] if ids else None
+            setattr(instance, '_' + self.name, conn.mget(ids) if ids else ids)
+        return getattr(instance, '_' + self.name)
+
+    def __set__(self, instance, value):
+        # We use '/' here because elasticsearch index and type name are not allowed to contain slashes
+        ids = ['%s/%s/%s' % (o._meta.index, o._meta.type, o._meta.id) for o in value or []]
+        instance[self.name] = ids if value else value
+        setattr(instance, '_' + self.name, value)
+
+        # TODO: Rather than returning simple list, should instead return a lazily evaluated list proxy.
