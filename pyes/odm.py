@@ -22,13 +22,17 @@ class ModelMeta(type):
                         raise ElasticModelException('Field name %s is reserved. Invalid %s' % (name, field))
                     cls._fields[name] = field
 
-        if cls.Meta.index and cls.Meta.type:
+        if getattr(cls.Meta, 'index', None) and getattr(cls.Meta, 'type', None):
             # TODO: Error checking here to make sure type and index are both defined on subclass!
-            mcs._registered_models.setdefault(cls.Meta.index, {})
-            mcs._registered_models[cls.Meta.index][cls.Meta.type] = cls
-            cls.objects = QuerySet(cls)
+            mcs.register_model(cls.Meta.index, cls.Meta.type, cls)
 
         return cls
+
+    @classmethod
+    def register_model(mcs, index, doc_type, model_cls):
+        mcs._registered_models.setdefault(index, {})
+        mcs._registered_models[index][doc_type] = model_cls
+        model_cls.objects = QuerySet(model_cls)
 
     @classmethod
     def get_registered_model(mcs, index, type):
